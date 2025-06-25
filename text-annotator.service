@@ -1,0 +1,14 @@
+[Unit]
+Description=Text Annotator Flask App
+After=network.target
+
+[Service]
+User=copmiler-ox
+Group=copmiler-ox
+WorkingDirectory=/home/copmiler-ox/text-annotator
+Environment=PATH=/home/copmiler-ox/text-annotator/venv/bin
+ExecStart=/home/copmiler-ox/text-annotator/venv/bin/gunicorn --worker-class eventlet -w 1 --bind 127.0.0.1:5000 app:app
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

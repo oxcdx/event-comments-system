@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ document.title }} - Text Annotator</title>
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/document.css') }}" rel="stylesheet">
+    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ document.title }}</h1>
+        <a href="/" class="back-button">← Back to Home</a>
+    </div>
+    
+    <div class="status-indicator" id="status-indicator">Connected</div>
+    
+    <div class="container">
+        <div class="document-content" id="document-content">
+            {{ document.content | safe }}
+        </div>
+        
+        <div class="sidebar">
+            <div class="annotation-controls">
+                <h3>Annotation Tools</h3>
+                
+                <div class="control-group">
+                    <label for="author-name">Your Name:</label>
+                    <input type="text" id="author-name" value="Anonymous" />
+                </div>
+                
+                <div class="control-group">
+                    <label for="comment-text">Comment:</label>
+                    <textarea id="comment-text" rows="3" placeholder="Add a comment to your selection..."></textarea>
+                </div>
+                
+                <div class="action-buttons">
+                    <button class="btn btn-primary" id="add-annotation">Add Annotation</button>
+                    <button class="btn btn-secondary" id="clear-selection">Clear Selection</button>
+                </div>
+            </div>
+            
+            <div class="annotations-list">
+                <h3>Annotations</h3>
+                <div id="annotations-container">
+                    <!-- Annotations will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+
+
+    <script>
+        const socket = io();
+        const docId = '{{ document.id }}';
+        let currentSelection = null;
+        const selectedColor = '#ffff00'; // Always yellow
+        let annotations = {{ annotations | tojson }};
+        
+        // Generate or get user session ID
+        let userSessionId = sessionStorage.getItem('userSessionId');
+        if (!userSessionId) {
+            userSessionId = 'user_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+            sessionStorage.setItem('userSessionId', userSessionId);
+        }
+        
+        // Join the document room
+        socket.emit('join_document', {doc_id: docId});
+        
+        // Socket event handlers
+        socket.on('connect', function() {
+            document.getElementById('status-indicator').className = 'status-indicator status-connected';
+            document.getElementById('status-indicator').textContent = 'Connected';
+            document.getElementById('status-indicator').style.display = 'block';
+            setTimeout(() => {
+                document.getElementById('status-indicator').style.display = 'none';
+            }, 3000);
+        });
+        
+        socket.on('disconnect', function() {
+            document.getElementById('status-indicator').className = 'status-indicator status-disconnected';
+            document.getElementById('status-indicator').textContent = 'Disconnected';
+            document.getElementById('status-indicator').style.display = 'block';
+        });
+        
+        socket.on('new_annotation', function(annotation) {
+            annotations.push(annotation);
+            updateAnnotationsDisplay();
+            applyHighlights();
+        });
+        
+        socket.on('annotation_removed', function(data) {
+            annotations = annotations.filter(a => a.id !== data.annotation_id);
+            updateAnnotationsDisplay();
+            applyHighlights();
+        });
+        
+        socket.on('annotation_edited', function(data) {
+            const annotation = annotations.find(a => a.id === data.annotation_id);
+            if (annotation) {
+                annotation.comment = data.new_comment;
+                updateAnnotationsDisplay();
+                applyHighlights();
+            }
+        });
+        
+        socket.on('error', function(data) {
+            alert(data.message);
+        });
+        
+        // Text selection handling
+        document.getElementById('document-content').addEventListener('mouseup', handleTextSelection);
+        document.getElementById('document-content').addEventListener('touchend', handleTextSelection);
+        
+        // Clear temporary highlight when clicking outside the document content
+        document.addEventListener('click', function(event) {
+            if (!document.getElementById('document-content').contains(event.target) && 
+                !document.getElementById('comment-text').contains(event.target) &&
+                !document.getElementById('add-annotation').contains(event.target)) {
+                removeTemporaryHighlight();
+                currentSelection = null;
+            }
+        });
+        
+        // Clear temporary highlight when pressing Escape
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                removeTemporaryHighlight();
+                window.getSelection().removeAllRanges();
+                currentSelection = null;
+            }
+        });
+        
+        function handleTextSelection() {
+            // Small delay to ensure selection is stable
+            setTimeout(() => {
+                const selection = window.getSelection();
+                console.log('Selection changed, range count:', selection.rangeCount); // Debug
+                
+                if (selection.rangeCount > 0 && !selection.isCollapsed) {
+                    const range = selection.getRangeAt(0);
+                    const selectedText = selection.toString().trim();
+                    
+                    console.log('Selected text:', selectedText); // Debug
+                    
+                    if (selectedText.length > 0) {
+                        currentSelection = {
+                            text: selectedText,
+                            range: range.cloneRange(),
+                            startOffset: getTextOffset(range.startContainer, range.startOffset),
+                            endOffset: getTextOffset(range.endContainer, range.endOffset)
+                        };
+                        
+                        console.log('Current selection:', currentSelection); // Debug
+                        
+                        // Add temporary highlight to the selected text
+                        addTemporaryHighlight(currentSelection.range);
+                        
+                        // Automatically focus the comment textarea
+                        document.getElementById('comment-text').focus();
+                    }
+                } else {
+                    console.log('No selection or collapsed selection'); // Debug
+                    // Clear temporary highlight when no selection
+                    removeTemporaryHighlight();
+                    currentSelection = null;
+                }
+            }, 10);
+        }
+        
+        function getTextOffset(node, offset) {
+            const documentContent = document.getElementById('document-content');
+            const walker = document.createTreeWalker(
+                documentContent,
+                NodeFilter.SHOW_TEXT,
+                null,
+                false
+            );
+            
+            let textOffset = 0;
+            let currentNode;
+            
+            while (currentNode = walker.nextNode()) {
+                if (currentNode === node) {
+                    return textOffset + offset;
+                }
+                textOffset += currentNode.textContent.length;
+            }
+            
+            return textOffset;
+        }
+        
+        // Sidebar button handlers
+        document.getElementById('add-annotation').addEventListener('click', function() {
+            if (currentSelection) {
+                addAnnotation();
+            } else {
+                alert('Please select some text first to add an annotation.');
+            }
+        });
+        
+        document.getElementById('clear-selection').addEventListener('click', function() {
+            window.getSelection().removeAllRanges();
+            removeTemporaryHighlight();
+            currentSelection = null;
+        });
+        
+        function addTemporaryHighlight(range) {
+            // Remove any existing temporary highlight first
+            removeTemporaryHighlight();
+            
+            console.log('Adding temporary highlight...'); // Debug
+            
+            const rects = range.getClientRects();
+            const containerRect = document.getElementById('document-content').getBoundingClientRect();
+            
+            console.log('Container rect:', containerRect); // Debug
+            console.log('Rects found:', rects.length); // Debug
+            
+            // Create temporary highlight overlays for each rectangle (handles line breaks)
+            for (let i = 0; i < rects.length; i++) {
+                const rect = rects[i];
+                const highlight = document.createElement('div');
+                
+                // Make it very visible for testing
+                highlight.style.position = 'absolute';
+                highlight.style.backgroundColor = '#ff0000'; // Red for testing
+                highlight.style.opacity = '0.8'; // High opacity for testing
+                highlight.style.zIndex = '999'; // Very high z-index
+                highlight.style.pointerEvents = 'none';
+                highlight.style.border = '3px solid #0000ff'; // Blue border
+                highlight.style.left = (rect.left - containerRect.left) + 'px';
+                highlight.style.top = (rect.top - containerRect.top) + 'px';
+                highlight.style.width = rect.width + 'px';
+                highlight.style.height = rect.height + 'px';
+                highlight.className = 'temporary-highlight';
+                highlight.dataset.temporary = 'true';
+                
+                console.log('Created highlight with rect:', rect); // Debug
+                console.log('Positioned at:', {
+                    left: highlight.style.left,
+                    top: highlight.style.top,
+                    width: highlight.style.width,
+                    height: highlight.style.height
+                }); // Debug
+                
+                document.getElementById('document-content').appendChild(highlight);
+            }
+            
+            console.log('Temporary highlights in DOM:', document.querySelectorAll('.temporary-highlight').length); // Debug
+        }
+        
+        function removeTemporaryHighlight() {
+            // Remove all temporary highlights
+            document.querySelectorAll('.temporary-highlight').forEach(el => el.remove());
+        }
+        
+        function addAnnotation() {
+            if (!currentSelection) {
+                alert('Please select some text first to add an annotation.');
+                return;
+            }
+            
+            const comment = document.getElementById('comment-text').value.trim();
+            const author = document.getElementById('author-name').value.trim();
+            
+            if (!author) {
+                alert('Please enter your name.');
+                document.getElementById('author-name').focus();
+                return;
+            }
+            
+            const annotation = {
+                doc_id: docId,
+                start_offset: currentSelection.startOffset,
+                end_offset: currentSelection.endOffset,
+                selected_text: currentSelection.text,
+                comment: comment,
+                author: author,
+                color: selectedColor,
+                session_id: userSessionId
+            };
+            
+            socket.emit('add_annotation', annotation);
+            
+            // Clear the form, selection, and temporary highlight
+            document.getElementById('comment-text').value = '';
+            window.getSelection().removeAllRanges();
+            removeTemporaryHighlight();
+            currentSelection = null;
+        }
+        
+        function updateAnnotationsDisplay() {
+            const container = document.getElementById('annotations-container');
+            container.innerHTML = '';
+            
+            annotations.forEach(annotation => {
+                const item = document.createElement('div');
+                item.className = 'annotation-item';
+                item.style.borderLeftColor = annotation.color;
+                item.dataset.annotationId = annotation.id;
+                
+                const isOwnAnnotation = annotation.session_id === userSessionId;
+                const commentHtml = annotation.comment ? 
+                    `<div class="annotation-comment" id="comment-display-${annotation.id}">${escapeHtml(annotation.comment)}</div>
+                     <textarea class="annotation-edit" id="comment-edit-${annotation.id}" style="display: none; width: 100%; margin-bottom: 8px;">${escapeHtml(annotation.comment)}</textarea>` : 
+                    '<div class="annotation-comment">No comment</div>';
+                
+                const actionsHtml = isOwnAnnotation ? 
+                    `<div class="annotation-actions">
+                        <button class="edit-annotation" onclick="editAnnotation('${annotation.id}')" style="background: #667eea; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 0.8em; margin-right: 5px;">Edit</button>
+                        <button class="save-annotation" onclick="saveAnnotation('${annotation.id}')" style="background: #48bb78; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 0.8em; margin-right: 5px; display: none;">Save</button>
+                        <button class="cancel-annotation" onclick="cancelEdit('${annotation.id}')" style="background: #a0aec0; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 0.8em; margin-right: 5px; display: none;">Cancel</button>
+                        <button class="remove-annotation" onclick="removeAnnotation('${annotation.id}')" style="background: #e53e3e; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 0.8em;">Delete</button>
+                     </div>` : '';
+                
+                item.innerHTML = `
+                    <div class="accordion mb-2" id="accordion-${annotation.id}">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="heading-${annotation.id}">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-${annotation.id}" aria-expanded="false" aria-controls="collapse-${annotation.id}" style="font-size: 0.8em; padding: 8px 12px;">
+                                    Quote
+                                </button>
+                            </h2>
+                            <div id="collapse-${annotation.id}" class="accordion-collapse collapse" aria-labelledby="heading-${annotation.id}" data-bs-parent="#accordion-${annotation.id}">
+                                <div class="accordion-body" style="padding: 8px 12px; font-size: 0.9em; font-style: italic; color: #666;">
+                                    "${escapeHtml(annotation.selected_text)}"
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    ${commentHtml}
+                    <div class="annotation-meta">
+                        <span>by ${escapeHtml(annotation.author)}</span>
+                        ${actionsHtml}
+                    </div>
+                `;
+                
+                // Add hover event listeners
+                item.addEventListener('mouseenter', function() {
+                    highlightAnnotation(annotation.id);
+                });
+                
+                item.addEventListener('mouseleave', function() {
+                    unhighlightAnnotation(annotation.id);
+                });
+                
+                container.appendChild(item);
+            });
+        }
+        
+        function highlightAnnotation(annotationId) {
+            const highlights = document.querySelectorAll(`[data-annotation-id="${annotationId}"]`);
+            highlights.forEach(highlight => {
+                if (highlight.classList.contains('annotation-highlight')) {
+                    highlight.classList.add('highlighted');
+                }
+            });
+        }
+        
+        function unhighlightAnnotation(annotationId) {
+            const highlights = document.querySelectorAll(`[data-annotation-id="${annotationId}"]`);
+            highlights.forEach(highlight => {
+                if (highlight.classList.contains('annotation-highlight')) {
+                    highlight.classList.remove('highlighted');
+                }
+            });
+        }
+        
+        function removeAnnotation(annotationId) {
+            socket.emit('remove_annotation', {
+                annotation_id: annotationId,
+                doc_id: docId,
+                session_id: userSessionId
+            });
+        }
+        
+        function editAnnotation(annotationId) {
+            const displayElement = document.getElementById(`comment-display-${annotationId}`);
+            const editElement = document.getElementById(`comment-edit-${annotationId}`);
+            const editButton = document.querySelector(`[onclick="editAnnotation('${annotationId}')"]`);
+            const saveButton = document.querySelector(`[onclick="saveAnnotation('${annotationId}')"]`);
+            const cancelButton = document.querySelector(`[onclick="cancelEdit('${annotationId}')"]`);
+            
+            // Hide display, show edit
+            displayElement.style.display = 'none';
+            editElement.style.display = 'block';
+            editButton.style.display = 'none';
+            saveButton.style.display = 'inline-block';
+            cancelButton.style.display = 'inline-block';
+            
+            // Focus the textarea
+            editElement.focus();
+        }
+        
+        function saveAnnotation(annotationId) {
+            const editElement = document.getElementById(`comment-edit-${annotationId}`);
+            const newComment = editElement.value.trim();
+            
+            socket.emit('edit_annotation', {
+                annotation_id: annotationId,
+                doc_id: docId,
+                new_comment: newComment,
+                session_id: userSessionId
+            });
+        }
+        
+        function cancelEdit(annotationId) {
+            const annotation = annotations.find(a => a.id === annotationId);
+            const displayElement = document.getElementById(`comment-display-${annotationId}`);
+            const editElement = document.getElementById(`comment-edit-${annotationId}`);
+            const editButton = document.querySelector(`[onclick="editAnnotation('${annotationId}')"]`);
+            const saveButton = document.querySelector(`[onclick="saveAnnotation('${annotationId}')"]`);
+            const cancelButton = document.querySelector(`[onclick="cancelEdit('${annotationId}')"]`);
+            
+            // Restore original value
+            editElement.value = annotation.comment || '';
+            
+            // Show display, hide edit
+            displayElement.style.display = 'block';
+            editElement.style.display = 'none';
+            editButton.style.display = 'inline-block';
+            saveButton.style.display = 'none';
+            cancelButton.style.display = 'none';
+        }
+        
+        function applyHighlights() {
+            // Remove existing permanent highlights (but keep temporary ones)
+            document.querySelectorAll('.annotation-highlight:not(.temporary-highlight)').forEach(el => el.remove());
+            
+            const documentContent = document.getElementById('document-content');
+            
+            // If no annotations, just return
+            if (annotations.length === 0) return;
+            
+            annotations.forEach((annotation, index) => {
+                try {
+                    const range = createRangeFromTextOffset(annotation.start_offset, annotation.end_offset);
+                    if (range) {
+                        createAnnotationOverlay(range, annotation, index);
+                    }
+                } catch (error) {
+                    console.warn('Failed to create overlay for annotation:', annotation, error);
+                }
+            });
+        }
+        
+        function createRangeFromTextOffset(startOffset, endOffset) {
+            const documentContent = document.getElementById('document-content');
+            const textContent = documentContent.textContent;
+            
+            // Validate offsets
+            if (startOffset < 0 || endOffset > textContent.length || startOffset >= endOffset) {
+                return null;
+            }
+            
+            const walker = document.createTreeWalker(
+                documentContent,
+                NodeFilter.SHOW_TEXT,
+                null,
+                false
+            );
+            
+            let currentOffset = 0;
+            let startNode = null, startPos = 0;
+            let endNode = null, endPos = 0;
+            let node;
+            
+            while (node = walker.nextNode()) {
+                const nodeLength = node.textContent.length;
+                const nodeEnd = currentOffset + nodeLength;
+                
+                if (startNode === null && startOffset >= currentOffset && startOffset <= nodeEnd) {
+                    startNode = node;
+                    startPos = startOffset - currentOffset;
+                }
+                
+                if (endNode === null && endOffset >= currentOffset && endOffset <= nodeEnd) {
+                    endNode = node;
+                    endPos = endOffset - currentOffset;
+                    break;
+                }
+                
+                currentOffset = nodeEnd;
+            }
+            
+            if (startNode && endNode) {
+                const range = document.createRange();
+                try {
+                    range.setStart(startNode, startPos);
+                    range.setEnd(endNode, endPos);
+                    return range;
+                } catch (error) {
+                    console.warn('Error creating range:', error);
+                    return null;
+                }
+            }
+            
+            return null;
+        }
+        
+        function createAnnotationOverlay(range, annotation, index) {
+            const rects = range.getClientRects();
+            const containerRect = document.getElementById('document-content').getBoundingClientRect();
+            
+            // Create highlight overlays for each rectangle (handles line breaks)
+            for (let i = 0; i < rects.length; i++) {
+                const rect = rects[i];
+                const highlight = document.createElement('div');
+                highlight.className = 'annotation-highlight';
+                highlight.style.backgroundColor = annotation.color;
+                highlight.style.left = (rect.left - containerRect.left) + 'px';
+                highlight.style.top = (rect.top - containerRect.top) + 'px';
+                highlight.style.width = rect.width + 'px';
+                highlight.style.height = rect.height + 'px';
+                highlight.title = `${annotation.author}: ${annotation.comment || 'Highlight'}`;
+                highlight.dataset.annotationId = annotation.id;
+                
+                document.getElementById('document-content').appendChild(highlight);
+            }
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Initialize the page
+        updateAnnotationsDisplay();
+        applyHighlights();
+        
+        // Reapply highlights when window is resized
+        window.addEventListener('resize', function() {
+            setTimeout(applyHighlights, 100);
+        });
+    </script>
+</body>
+</html>
