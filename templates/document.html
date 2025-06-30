@@ -4,57 +4,144 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ document.title }} - Text Annotator</title>
-    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/document.css') }}" rel="stylesheet">
-    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
+    <link href="{% if base_path %}{{ base_url_for('static', filename='css/bootstrap.min.css') }}{% else %}{{ url_for('static', filename='css/bootstrap.min.css') }}{% endif %}" rel="stylesheet">
+    <link href="{% if base_path %}{{ base_url_for('static', filename='css/document.css') }}{% else %}{{ url_for('static', filename='css/document.css') }}{% endif %}" rel="stylesheet">
+    <script src="{% if base_path %}{{ base_url_for('static', filename='js/bootstrap.bundle.min.js') }}{% else %}{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}{% endif %}"></script>
+    <script src="{% if base_path %}{{ base_url_for('static', filename='js/socket.io.min.js') }}{% else %}{{ url_for('static', filename='js/socket.io.min.js') }}{% endif %}"></script>
 </head>
 <body>
-    <div class="header">
-        <h1>{{ document.title }}</h1>
-        <a href="/" class="back-button">← Back to Home</a>
+
+  <!-- Toggle button for offcanvas sidebar on smaller screens -->
+  <button class="btn btn-primary d-lg-none position-fixed bottom-0 end-0 m-3 z-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#annotationOffcanvas" aria-controls="annotationOffcanvas" id="sidebarToggle">
+    <i class="bi bi-chat-dots"></i> Comments
+  </button>
+
+  <div class="header logo-container-annotator">
+    <div class="">
+      <a href="{{ base_path }}/">
+        <img
+          src="{% if base_path %}{{ base_url_for('static', filename='web-logo.jpg') }}{% else %}{{ url_for('static', filename='web-logo.jpg') }}{% endif %}"
+          alt="Logo" class="web-logo">
+      </a>
     </div>
-    
-    <div class="status-indicator" id="status-indicator">Connected</div>
-    
-    <div class="container">
-        <div class="document-content" id="document-content">
-            {{ document.content | safe }}
-        </div>
-        
+    <a href="{{ base_path }}/" class="back-button">← <span class="d-none d-lg-inline-block">All Lectures</span></a>
+  </div>
+
+  <div class="status-indicator" id="status-indicator">Connected</div>
+
+  <!-- Mobile selection tooltip -->
+  <div class="selection-tooltip d-lg-none" id="selectionTooltip">
+    Add Comment
+  </div>
+
+  
+
+  <div class="container">
+    <div class="row">
+
+      <div class="document-content col-12 col-lg-7" id="document-content">
+        {{ document.content | safe }}
+      </div>
+
+      <!-- Desktop sidebar (lg and up) -->
+      <div class="col-lg-5  d-none d-lg-block">
         <div class="sidebar">
-            <div class="annotation-controls">
-                <h3>Annotation Tools</h3>
-                
-                <div class="control-group">
-                    <label for="author-name">Your Name:</label>
-                    <input type="text" id="author-name" value="Anonymous" />
-                </div>
-                
-                <div class="control-group">
-                    <label for="comment-text">Comment:</label>
-                    <textarea id="comment-text" rows="3" placeholder="Add a comment to your selection..."></textarea>
-                </div>
-                
-                <div class="action-buttons">
-                    <button class="btn btn-primary" id="add-annotation">Add Annotation</button>
-                    <button class="btn btn-secondary" id="clear-selection">Clear Selection</button>
-                </div>
+          <div class="annotation-controls">
+            <h3>Annotation Tools</h3>
+
+            <div class="control-group">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="highlightsToggle" checked>
+                <label class="form-check-label" for="highlightsToggle">
+                  Show Highlights
+                </label>
+              </div>
             </div>
-            
-            <div class="annotations-list">
-                <h3>Annotations</h3>
-                <div id="annotations-container">
-                    <!-- Annotations will be loaded here -->
-                </div>
+
+            <div class="control-group">
+              <label for="author-name">Your Name:</label>
+              <input type="text" id="author-name" value="Anonymous" />
             </div>
+
+            <div class="control-group">
+              <label for="comment-text">Comment:</label>
+              <textarea id="comment-text" rows="3" placeholder="Add a comment to your selection..."></textarea>
+            </div>
+
+            <div class="action-buttons">
+              <button class="btn btn-primary" id="add-annotation">Add Annotation</button>
+              <button class="btn btn-secondary" id="clear-selection">Clear Selection</button>
+            </div>
+          </div>
+
+          <div class="annotations-list">
+            <h3>Comments</h3>
+            <div id="annotations-container">
+              <!-- Annotations will be loaded here -->
+            </div>
+          </div>
         </div>
+      </div>
     </div>
+  </div>
+
+  <!-- Offcanvas sidebar for mobile/tablet (under lg) -->
+  <div class="offcanvas offcanvas-end d-lg-none" tabindex="-1" id="annotationOffcanvas" aria-labelledby="annotationOffcanvasLabel">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title" id="annotationOffcanvasLabel">Annotation Tools</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body">
+      <div class="annotation-controls">
+        <div class="control-group">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch" id="highlightsToggleMobile" checked>
+            <label class="form-check-label" for="highlightsToggleMobile">
+              Show Highlights
+            </label>
+          </div>
+        </div>
+
+        <!-- Selected text display for mobile -->
+        <div class="control-group d-none" id="selected-text-mobile">
+          <label>Selected Text:</label>
+          <div class="selected-text-preview" id="selected-text-preview" style="background: #f8f9fa; border: 1px solid #ddd; padding: 8px; border-radius: 4px; font-style: italic; color: #666; max-height: 100px; overflow-y: auto;">
+            No text selected
+          </div>
+        </div>
+
+        <div class="control-group">
+          <label for="author-name-mobile">Your Name:</label>
+          <input type="text" id="author-name-mobile" value="Anonymous" />
+        </div>
+
+        <div class="control-group">
+          <label for="comment-text-mobile">Comment:</label>
+          <textarea id="comment-text-mobile" rows="3" placeholder="Add a comment to your selection..."></textarea>
+        </div>
+
+        <div class="action-buttons">
+          <button class="btn btn-primary" id="add-annotation-mobile">Add Annotation</button>
+          <button class="btn btn-secondary" id="clear-selection-mobile">Clear Selection</button>
+        </div>
+      </div>
+
+      <div class="annotations-list">
+        <h3>Comments</h3>
+        <div id="annotations-container-mobile">
+          <!-- Annotations will be loaded here -->
+        </div>
+      </div>
+    </div>
+  </div>
     
 
 
     <script>
-        const socket = io();
+        // Configure Socket.IO to use the correct path for /talks subpath
+        const socket = io('{{ base_path }}', {
+            path: '{{ base_path }}/socket.io'
+        });
         const docId = '{{ document.id }}';
         let currentSelection = null;
         const selectedColor = '#ffff00'; // Always yellow
@@ -111,16 +198,45 @@
             alert(data.message);
         });
         
-        // Text selection handling
-        document.getElementById('document-content').addEventListener('mouseup', handleTextSelection);
-        document.getElementById('document-content').addEventListener('touchend', handleTextSelection);
+        // Text selection handling - use selectionchange for better mobile support
+        let selectionTimeout = null;
+        let lastTouchEnd = 0;
+        
+        document.addEventListener('selectionchange', function() {
+            // Clear any existing timeout
+            if (selectionTimeout) {
+                clearTimeout(selectionTimeout);
+            }
+            
+            // Set a longer timeout to allow users to adjust selection on mobile
+            selectionTimeout = setTimeout(handleTextSelection, 1200); // 1.2 seconds delay
+        });
+        
+        // Better touch handling for mobile devices
+        document.getElementById('document-content').addEventListener('touchend', function(e) {
+            lastTouchEnd = Date.now();
+            // Give much more time for touch selection to stabilize and allow adjustment
+            setTimeout(() => {
+                // Only process if this was the last touch event and enough time has passed
+                if (Date.now() - lastTouchEnd >= 800) {
+                    handleTextSelection();
+                }
+            }, 1000); // 1 second delay after touch ends
+        });
+        
+        // Keep mouseup for desktop with shorter delay
+        document.getElementById('document-content').addEventListener('mouseup', function() {
+            setTimeout(handleTextSelection, 100);
+        });
         
         // Clear temporary highlight when clicking outside the document content
         document.addEventListener('click', function(event) {
             if (!document.getElementById('document-content').contains(event.target) && 
                 !document.getElementById('comment-text').contains(event.target) &&
-                !document.getElementById('add-annotation').contains(event.target)) {
+                !document.getElementById('add-annotation').contains(event.target) &&
+                !document.getElementById('selectionTooltip').contains(event.target)) {
                 removeTemporaryHighlight();
+                hideMobileTooltip();
                 currentSelection = null;
             }
         });
@@ -130,28 +246,42 @@
             if (event.key === 'Escape') {
                 removeTemporaryHighlight();
                 window.getSelection().removeAllRanges();
+                hideMobileTooltip();
                 currentSelection = null;
             }
         });
         
         function handleTextSelection() {
-            // Small delay to ensure selection is stable
-            setTimeout(() => {
-                const selection = window.getSelection();
-                console.log('Selection changed, range count:', selection.rangeCount); // Debug
+            const selection = window.getSelection();
+            console.log('Selection changed, range count:', selection.rangeCount); // Debug
+            
+            if (selection.rangeCount > 0 && !selection.isCollapsed) {
+                const range = selection.getRangeAt(0);
                 
-                if (selection.rangeCount > 0 && !selection.isCollapsed) {
-                    const range = selection.getRangeAt(0);
-                    const selectedText = selection.toString().trim();
+                // Check if selection is within document content
+                const documentContent = document.getElementById('document-content');
+                if (!documentContent.contains(range.commonAncestorContainer) && 
+                    range.commonAncestorContainer !== documentContent) {
+                    console.log('Selection not in document content'); // Debug
+                    return;
+                }
+                
+                // Expand selection to word boundaries
+                const expandedRange = expandToWordBoundaries(range);
+                if (expandedRange) {
+                    // Update the selection to the expanded range
+                    selection.removeAllRanges();
+                    selection.addRange(expandedRange);
                     
-                    console.log('Selected text:', selectedText); // Debug
+                    const selectedText = expandedRange.toString().trim();
+                    console.log('Expanded selected text:', selectedText); // Debug
                     
                     if (selectedText.length > 0) {
                         currentSelection = {
                             text: selectedText,
-                            range: range.cloneRange(),
-                            startOffset: getTextOffset(range.startContainer, range.startOffset),
-                            endOffset: getTextOffset(range.endContainer, range.endOffset)
+                            range: expandedRange.cloneRange(),
+                            startOffset: getTextOffset(expandedRange.startContainer, expandedRange.startOffset),
+                            endOffset: getTextOffset(expandedRange.endContainer, expandedRange.endOffset)
                         };
                         
                         console.log('Current selection:', currentSelection); // Debug
@@ -159,16 +289,153 @@
                         // Add temporary highlight to the selected text
                         addTemporaryHighlight(currentSelection.range);
                         
-                        // Automatically focus the comment textarea
-                        document.getElementById('comment-text').focus();
+                        // Update mobile selected text preview
+                        updateSelectedTextPreview(selectedText);
+                        
+                        // Show mobile tooltip instead of auto-opening offcanvas
+                        if (window.innerWidth < 992) {
+                            showMobileTooltip(currentSelection.range);
+                        } else {
+                            // Focus the appropriate comment textarea on desktop
+                            const activeElements = getActiveElements();
+                            activeElements.commentText.focus();
+                        }
                     }
-                } else {
-                    console.log('No selection or collapsed selection'); // Debug
-                    // Clear temporary highlight when no selection
-                    removeTemporaryHighlight();
-                    currentSelection = null;
                 }
-            }, 10);
+            } else {
+                console.log('No selection or collapsed selection'); // Debug
+                // Clear temporary highlight when no selection
+                removeTemporaryHighlight();
+                clearSelectedTextPreview();
+                hideMobileTooltip();
+                currentSelection = null;
+            }
+        }
+        
+        function updateSelectedTextPreview(selectedText) {
+            if (window.innerWidth < 992) { // Only for mobile
+                const previewElement = document.getElementById('selected-text-preview');
+                const containerElement = document.getElementById('selected-text-mobile');
+                
+                if (selectedText && selectedText.trim()) {
+                    previewElement.textContent = selectedText;
+                    containerElement.classList.remove('d-none');
+                } else {
+                    clearSelectedTextPreview();
+                }
+            }
+        }
+        
+        function expandToWordBoundaries(range) {
+            try {
+                const startContainer = range.startContainer;
+                const endContainer = range.endContainer;
+                const startOffset = range.startOffset;
+                const endOffset = range.endOffset;
+                
+                // Create a new range to work with
+                const expandedRange = range.cloneRange();
+                
+                // Expand start to word boundary
+                if (startContainer.nodeType === Node.TEXT_NODE) {
+                    const startText = startContainer.textContent;
+                    let newStartOffset = startOffset;
+                    
+                    // Move backwards to find word start (or beginning of text)
+                    while (newStartOffset > 0 && /\w/.test(startText.charAt(newStartOffset - 1))) {
+                        newStartOffset--;
+                    }
+                    
+                    expandedRange.setStart(startContainer, newStartOffset);
+                }
+                
+                // Expand end to word boundary
+                if (endContainer.nodeType === Node.TEXT_NODE) {
+                    const endText = endContainer.textContent;
+                    let newEndOffset = endOffset;
+                    
+                    // Move forwards to find word end (or end of text)
+                    while (newEndOffset < endText.length && /\w/.test(endText.charAt(newEndOffset))) {
+                        newEndOffset++;
+                    }
+                    
+                    expandedRange.setEnd(endContainer, newEndOffset);
+                }
+                
+                return expandedRange;
+            } catch (error) {
+                console.warn('Error expanding to word boundaries:', error);
+                return range; // Return original range if expansion fails
+            }
+        }
+        
+        function clearSelectedTextPreview() {
+            const previewElement = document.getElementById('selected-text-preview');
+            const containerElement = document.getElementById('selected-text-mobile');
+            
+            previewElement.textContent = 'No text selected';
+            containerElement.classList.add('d-none');
+        }
+        
+        function showMobileTooltip(range) {
+            const tooltip = document.getElementById('selectionTooltip');
+            if (!tooltip) return;
+            
+            // Get the bounding rect of the selection
+            const rects = range.getClientRects();
+            if (rects.length === 0) return;
+            
+            // Use the last rect (end of selection) for positioning
+            const lastRect = rects[rects.length - 1];
+            const documentContent = document.getElementById('document-content');
+            const contentRect = documentContent.getBoundingClientRect();
+            
+            // Position tooltip above the end of selection, relative to document
+            let tooltipX = lastRect.left + (lastRect.width / 2); // Center on selection
+            let tooltipY = lastRect.top - 50; // 50px above the selection
+            
+            // Ensure tooltip stays within viewport bounds
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            const tooltipWidth = 120; // Approximate tooltip width
+            const tooltipHeight = 40; // Approximate tooltip height
+            
+            // Adjust X position
+            if (tooltipX - tooltipWidth / 2 < 10) {
+                tooltipX = tooltipWidth / 2 + 10;
+            } else if (tooltipX + tooltipWidth / 2 > viewportWidth - 10) {
+                tooltipX = viewportWidth - tooltipWidth / 2 - 10;
+            }
+            
+            // Adjust Y position - if too close to top, show below selection
+            if (tooltipY < 60) {
+                tooltipY = lastRect.bottom + 10;
+            }
+            
+            tooltip.style.left = tooltipX + 'px';
+            tooltip.style.top = (tooltipY + window.scrollY) + 'px';
+            tooltip.classList.add('show');
+            
+            console.log('Showing tooltip at:', tooltipX, tooltipY); // Debug
+            
+            // Add click handler if not already added
+            if (!tooltip.hasAttribute('data-click-handler')) {
+                tooltip.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    hideMobileTooltip();
+                    removeTemporaryHighlight();
+                    openMobileOffcanvas();
+                });
+                tooltip.setAttribute('data-click-handler', 'true');
+            }
+        }
+        
+        function hideMobileTooltip() {
+            const tooltip = document.getElementById('selectionTooltip');
+            if (tooltip) {
+                tooltip.classList.remove('show');
+            }
         }
         
         function getTextOffset(node, offset) {
@@ -202,10 +469,116 @@
             }
         });
         
+        document.getElementById('add-annotation-mobile').addEventListener('click', function() {
+            if (currentSelection) {
+                addAnnotation();
+            } else {
+                alert('Please select some text first to add an annotation.');
+            }
+        });
+        
         document.getElementById('clear-selection').addEventListener('click', function() {
             window.getSelection().removeAllRanges();
             removeTemporaryHighlight();
+            clearSelectedTextPreview();
+            hideMobileTooltip();
             currentSelection = null;
+        });
+        
+        document.getElementById('clear-selection-mobile').addEventListener('click', function() {
+            window.getSelection().removeAllRanges();
+            removeTemporaryHighlight();
+            clearSelectedTextPreview();
+            hideMobileTooltip();
+            currentSelection = null;
+        });
+        
+        // Highlights toggle handlers
+        document.getElementById('highlightsToggle').addEventListener('change', function() {
+            toggleHighlights(this.checked);
+            // Sync with mobile toggle
+            document.getElementById('highlightsToggleMobile').checked = this.checked;
+        });
+        
+        document.getElementById('highlightsToggleMobile').addEventListener('change', function() {
+            toggleHighlights(this.checked);
+            // Sync with desktop toggle
+            document.getElementById('highlightsToggle').checked = this.checked;
+        });
+        
+        function toggleHighlights(show) {
+            const highlights = document.querySelectorAll('.annotation-highlight');
+            highlights.forEach(highlight => {
+                highlight.style.display = show ? 'block' : 'none';
+            });
+        }
+        
+        // Function to open offcanvas on mobile
+        function openMobileOffcanvas() {
+            if (window.innerWidth < 992) { // Bootstrap lg breakpoint
+                const offcanvas = new bootstrap.Offcanvas(document.getElementById('annotationOffcanvas'));
+                offcanvas.show();
+            }
+        }
+        
+        // Function to get appropriate input elements based on screen size
+        function getActiveElements() {
+            if (window.innerWidth < 992) {
+                return {
+                    authorName: document.getElementById('author-name-mobile'),
+                    commentText: document.getElementById('comment-text-mobile'),
+                    annotationsContainer: document.getElementById('annotations-container-mobile')
+                };
+            } else {
+                return {
+                    authorName: document.getElementById('author-name'),
+                    commentText: document.getElementById('comment-text'),
+                    annotationsContainer: document.getElementById('annotations-container')
+                };
+            }
+        }
+        
+        // Sync values between desktop and mobile inputs
+        function syncInputValues() {
+            const desktopAuthor = document.getElementById('author-name').value;
+            const mobileAuthor = document.getElementById('author-name-mobile').value;
+            const desktopComment = document.getElementById('comment-text').value;
+            const mobileComment = document.getElementById('comment-text-mobile').value;
+            
+            // Sync author names
+            if (desktopAuthor !== mobileAuthor) {
+                if (window.innerWidth < 992) {
+                    document.getElementById('author-name').value = mobileAuthor;
+                } else {
+                    document.getElementById('author-name-mobile').value = desktopAuthor;
+                }
+            }
+            
+            // Sync comments
+            if (desktopComment !== mobileComment) {
+                if (window.innerWidth < 992) {
+                    document.getElementById('comment-text').value = mobileComment;
+                } else {
+                    document.getElementById('comment-text-mobile').value = desktopComment;
+                }
+            }
+        }
+        
+        // Add input event listeners for syncing
+        document.getElementById('author-name').addEventListener('input', function() {
+            document.getElementById('author-name-mobile').value = this.value;
+        });
+        
+        document.getElementById('author-name-mobile').addEventListener('input', function() {
+            document.getElementById('author-name').value = this.value;
+        });
+        
+        document.getElementById('comment-text').addEventListener('input', function() {
+            document.getElementById('comment-text-mobile').value = this.value;
+        });
+        
+        document.getElementById('comment-text-mobile').addEventListener('input', function() {
+            document.getElementById('comment-text').value = this.value;
         });
         
         function addTemporaryHighlight(range) {
@@ -264,12 +637,13 @@
                 return;
             }
             
-            const comment = document.getElementById('comment-text').value.trim();
-            const author = document.getElementById('author-name').value.trim();
+            const activeElements = getActiveElements();
+            const comment = activeElements.commentText.value.trim();
+            const author = activeElements.authorName.value.trim();
             
             if (!author) {
                 alert('Please enter your name.');
-                document.getElementById('author-name').focus();
+                activeElements.authorName.focus();
                 return;
             }
             
@@ -288,21 +662,26 @@
             
             // Clear the form, selection, and temporary highlight
             document.getElementById('comment-text').value = '';
+            document.getElementById('comment-text-mobile').value = '';
             window.getSelection().removeAllRanges();
             removeTemporaryHighlight();
+            clearSelectedTextPreview();
             currentSelection = null;
         }
         
         function updateAnnotationsDisplay() {
             const container = document.getElementById('annotations-container');
-            container.innerHTML = '';
+            const mobileContainer = document.getElementById('annotations-container-mobile');
+            const annotationHTML = generateAnnotationsHTML();
+            
+            container.innerHTML = annotationHTML;
+            mobileContainer.innerHTML = annotationHTML;
+        }
+        
+        function generateAnnotationsHTML() {
+            let html = '';
             
             annotations.forEach(annotation => {
-                const item = document.createElement('div');
-                item.className = 'annotation-item';
-                item.style.borderLeftColor = annotation.color;
-                item.dataset.annotationId = annotation.id;
-                
                 const isOwnAnnotation = annotation.session_id === userSessionId;
                 const commentHtml = annotation.comment ? 
                     `<div class="annotation-comment" id="comment-display-${annotation.id}">${escapeHtml(annotation.comment)}</div>
@@ -317,39 +696,34 @@
                         <button class="remove-annotation" onclick="removeAnnotation('${annotation.id}')" style="background: #e53e3e; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 0.8em;">Delete</button>
                      </div>` : '';
                 
-                item.innerHTML = `
-                    <div class="accordion mb-2" id="accordion-${annotation.id}">
-                        <div class="accordion-item">
-                            <h2 class="accordion-header" id="heading-${annotation.id}">
-                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-${annotation.id}" aria-expanded="false" aria-controls="collapse-${annotation.id}" style="font-size: 0.8em; padding: 8px 12px;">
-                                    Quote
-                                </button>
-                            </h2>
-                            <div id="collapse-${annotation.id}" class="accordion-collapse collapse" aria-labelledby="heading-${annotation.id}" data-bs-parent="#accordion-${annotation.id}">
-                                <div class="accordion-body" style="padding: 8px 12px; font-size: 0.9em; font-style: italic; color: #666;">
-                                    "${escapeHtml(annotation.selected_text)}"
+                const itemHTML = `
+                    <div class="annotation-item" style="background: #f8f9fa; border-left: 4px solid ${annotation.color}; padding: 15px; margin-bottom: 10px; position: relative;" data-annotation-id="${annotation.id}">
+                        <div class="accordion mb-2" id="accordion-${annotation.id}">
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="heading-${annotation.id}">
+                                    <button class="accordion-button collapsed p-1" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-${annotation.id}" aria-expanded="false" aria-controls="collapse-${annotation.id}" >
+                                        Quoted Text
+                                    </button>
+                                </h2>
+                                <div id="collapse-${annotation.id}" class="accordion-collapse collapse" aria-labelledby="heading-${annotation.id}" data-bs-parent="#accordion-${annotation.id}">
+                                    <div class="accordion-body" style="padding: 8px 12px; font-size: 0.9em; font-style: italic; color: #666;">
+                                        "${escapeHtml(annotation.selected_text)}"
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                    ${commentHtml}
-                    <div class="annotation-meta">
-                        <span>by ${escapeHtml(annotation.author)}</span>
-                        ${actionsHtml}
+                        ${commentHtml}
+                        <div class="annotation-meta">
+                            <span>by ${escapeHtml(annotation.author)}</span>
+                            ${actionsHtml}
+                        </div>
                     </div>
                 `;
                 
-                // Add hover event listeners
-                item.addEventListener('mouseenter', function() {
-                    highlightAnnotation(annotation.id);
-                });
-                
-                item.addEventListener('mouseleave', function() {
-                    unhighlightAnnotation(annotation.id);
-                });
-                
-                container.appendChild(item);
+                html += itemHTML;
             });
+            
+            return html;
         }
         
         function highlightAnnotation(annotationId) {

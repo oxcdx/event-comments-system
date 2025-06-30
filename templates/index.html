@@ -4,114 +4,161 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Text Annotator</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-        }
-        
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            padding: 40px;
-        }
-        
-        h1 {
-            text-align: center;
-            color: #333;
-            margin-bottom: 30px;
-            font-size: 2.5em;
-        }
-        
-        .welcome-text {
-            text-align: center;
-            color: #666;
-            font-size: 1.2em;
-            margin-bottom: 40px;
-            line-height: 1.6;
-        }
-        
-        .document-link {
-            display: block;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            text-decoration: none;
-            padding: 20px 30px;
-            border-radius: 10px;
-            text-align: center;
-            font-size: 1.3em;
-            font-weight: bold;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            margin: 20px 0;
-        }
-        
-        .document-link:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-        }
-        
-        .features {
-            margin-top: 40px;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-        }
-        
-        .feature {
-            text-align: center;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 10px;
-            border-left: 4px solid #667eea;
-        }
-        
-        .feature h3 {
-            color: #333;
-            margin-bottom: 10px;
-        }
-        
-        .feature p {
-            color: #666;
-            font-size: 0.9em;
-        }
-    </style>
+    <link href="{% if base_path %}{{ base_url_for('static', filename='css/document.css') }}{% else %}{{ url_for('static', filename='css/document.css') }}{% endif %}" rel="stylesheet">
+
 </head>
-<body>
-    <div class="container">
-        <h1>📝 Text Annotator</h1>
+<body class="index-body">
+
+    <div class="logo-container">
+        <img src="{% if base_path %}{{ base_url_for('static', filename='web-logo.jpg') }}{% else %}{{ url_for('static', filename='web-logo.jpg') }}{% endif %}" alt="Logo" class="web-logo">
+    </div>
+    
+    <div class="index-container">
+        <h1 class="index-h1">Live Forum</h1>
         <p class="welcome-text">
-            Welcome to the collaborative text annotation system! Select text, add comments, 
-            and see real-time highlights from all users.
+            Welcome to Digital x Data sharing space. See abstracts of the conference lectures, add comments to specific text and points of interest, 
+            and chat with other attendees.
         </p>
         
-        <a href="/document/sample" class="document-link">
-            🚀 Open Sample Document
-        </a>
-        
         <div class="features">
-            <div class="feature">
-                <h3>🎯 Real-time</h3>
-                <p>See annotations from all users instantly</p>
+          <div class="day" data-date="20250630">
+          <div>
+            <h2>Thursday 03 July</h2>
+          </div>
+          <div>
+            <div class="feature" data-datetime="202507031500" data-endtime="202507031700">
+                <a href="{% if base_path %}{{ base_path }}/document/sample{% else %}/document/sample{% endif %}">
+                    <h3>Hyperlocal Hotspot – Compiler</h3>
+                </a>
+                <p>15:00 – 17:00 Workshop</p>
             </div>
-            <div class="feature">
-                <h3>💬 Comments</h3>
-                <p>Add contextual comments to any text selection</p>
+            <div class="feature" data-datetime="202507031800" data-endtime="202507031930">
+                <h3>Planetary Design: On the emerging logics of Generative AI – Orit Halpern</h3>
+                <p>18:00 – 19:30 Welcome to conference & Keynote lecture</p>
             </div>
-            <div class="feature">
-                <h3>🎨 Highlights</h3>
-                <p>Color-coded highlighting for easy identification</p>
+          </div>
+          </div>
+          <div class="day" data-date="20250704">
+          <div>
+            <h2>Friday 04 July</h2>
+            <div class="feature" data-datetime="202507041000" data-endtime="202507041100">
+                <h3>Diffractive Politics: Accelerationism, Computation, & the Political – Ezekiel Dixon-Román</h3>
+                <p>10:00 – 11:00 Keynote lecture</p>
             </div>
-            <div class="feature">
-                <h3>💾 Persistent</h3>
-                <p>All annotations are saved automatically</p>
+            <div class="feature" data-datetime="202507041130" data-endtime="202507041230">
+                <h3>Infrastructures of Political Values, convened by Ozan Kamiloglu</h3>
+                <p>Paradigms of Intelligence as Infrastructure for Political Value in Human-AI Decision-Making – Connal Parsley</p>
+                <p>11:30 – 12:30</p>
             </div>
+            <div class="feature" data-datetime="202507041330" data-endtime="202507041430">
+                <h3>Infrastructuring Architecture Knowledge, convened by Igea Troiani</h3>
+                <p>Digital tools for Inclusive Architectural Histories: Closing the gaps with AI? – Sol Pérez Martínez</p>
+                <p>13:30 – 14:30</p>
+            </div>
+            <div class="feature" data-datetime="202507041500" data-endtime="202507041600">
+                <h3>Reimagining AI and IT for Sustainable Infrastructure, convened by Kasra Kassai</h3>
+                <p>Striving for more Sustainable AI Architecture – Oliver Cronk</p>
+                <p>Designing out Waste in IT systems – Astrid Wynne</p>
+                <p>15:00 – 16:00</p>
+            </div>
+            <div class="feature" data-datetime="202507041615" data-endtime="202507041700">
+                <h3>Discussion</h3>
+                <p>16:15 – 17:00</p>
+            </div>
+          </div>
+          </div>
         </div>
     </div>
+    
+    <script>
+        function updateCurrentFeature() {
+            // Get current date and time in the format yyyymmddhhmm
+            const now = new Date();
+            const currentDateTime = now.getFullYear().toString() + 
+                                  (now.getMonth() + 1).toString().padStart(2, '0') + 
+                                  now.getDate().toString().padStart(2, '0') + 
+                                  now.getHours().toString().padStart(2, '0') + 
+                                  now.getMinutes().toString().padStart(2, '0');
+            
+            const currentDate = currentDateTime.substr(0, 8); // yyyymmdd format
+            
+            // Get all features with datetime attributes
+            const features = document.querySelectorAll('.feature[data-datetime]');
+            let currentFeature = null;
+            let nextFeature = null;
+            
+            // Remove existing highlight
+            features.forEach(feature => {
+                feature.classList.remove('current-or-upcoming');
+            });
+            
+            // Find current or next upcoming feature
+            for (let feature of features) {
+                const startTime = feature.getAttribute('data-datetime');
+                const endTime = feature.getAttribute('data-endtime');
+                
+                // Check if event is currently happening
+                if (currentDateTime >= startTime && currentDateTime <= endTime) {
+                    currentFeature = feature;
+                    break;
+                }
+                
+                // Check if this is the next upcoming event
+                if (currentDateTime < startTime) {
+                    if (!nextFeature || startTime < nextFeature.getAttribute('data-datetime')) {
+                        nextFeature = feature;
+                    }
+                }
+            }
+            
+            // Apply highlight to current feature, or next upcoming if nothing is current
+            const featureToHighlight = currentFeature || nextFeature;
+            if (featureToHighlight) {
+                featureToHighlight.classList.add('current-or-upcoming');
+            }
+        }
+        
+        function reorderDays() {
+            const now = new Date();
+            const currentDate = now.getFullYear().toString() + 
+                              (now.getMonth() + 1).toString().padStart(2, '0') + 
+                              now.getDate().toString().padStart(2, '0');
+            
+            const featuresContainer = document.querySelector('.features');
+            const days = Array.from(document.querySelectorAll('.day[data-date]'));
+            
+            // Sort days: current/future days first, then past days
+            days.sort((a, b) => {
+                const dateA = a.getAttribute('data-date');
+                const dateB = b.getAttribute('data-date');
+                
+                const isACurrentOrFuture = dateA >= currentDate;
+                const isBCurrentOrFuture = dateB >= currentDate;
+                
+                // If both are current/future or both are past, sort by date
+                if (isACurrentOrFuture === isBCurrentOrFuture) {
+                    return dateA.localeCompare(dateB);
+                }
+                
+                // Current/future days come first
+                return isBCurrentOrFuture ? 1 : -1;
+            });
+            
+            // Reorder the DOM elements
+            days.forEach(day => {
+                featuresContainer.appendChild(day);
+            });
+        }
+        
+        // Update on page load
+        reorderDays();
+        updateCurrentFeature();
+        
+        // Update every minute
+        setInterval(() => {
+            reorderDays();
+            updateCurrentFeature();
+        }, 60000);
+    </script>
 </body>
 </html>

@@ -7,6 +7,7 @@ User=copmiler-ox
 Group=copmiler-ox
 WorkingDirectory=/home/copmiler-ox/text-annotator
 Environment=PATH=/home/copmiler-ox/text-annotator/venv/bin
+Environment=BASE_PATH=/talks
 ExecStart=/home/copmiler-ox/text-annotator/venv/bin/gunicorn --worker-class eventlet -w 1 --bind 127.0.0.1:5000 app:app
 Restart=always
 

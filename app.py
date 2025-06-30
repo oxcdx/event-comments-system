@@ -6,6 +6,7 @@ import json
 import logging
 from datetime import datetime
 import threading
+import os
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -13,6 +14,10 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-change-this'
+
+# Configure base path for when app is served under a subpath like /talks
+BASE_PATH = os.environ.get('BASE_PATH', '')
+
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Database initialization
