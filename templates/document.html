@@ -201,40 +201,58 @@
         // Text selection handling - use selectionchange for better mobile support
         let selectionTimeout = null;
         let lastTouchEnd = 0;
+        let isProcessingSelection = false; // Flag to prevent recursive calls
         
         document.addEventListener('selectionchange', function() {
-            // Clear any existing timeout
-            if (selectionTimeout) {
-                clearTimeout(selectionTimeout);
+            if (window.innerWidth < 992) {
+              // Ignore selection changes while we're processing
+              if (isProcessingSelection) {
+                  return;
+              }
+              
+              // Clear any existing timeout
+              if (selectionTimeout) {
+                  clearTimeout(selectionTimeout);
+              }
+              
+              // Set a longer timeout to allow users to adjust selection on mobile
+              selectionTimeout = setTimeout(handleTextSelection, 1200); // 1.2 seconds delay
             }
-            
-            // Set a longer timeout to allow users to adjust selection on mobile
-            selectionTimeout = setTimeout(handleTextSelection, 1200); // 1.2 seconds delay
         });
         
         // Better touch handling for mobile devices
-        document.getElementById('document-content').addEventListener('touchend', function(e) {
-            lastTouchEnd = Date.now();
-            // Give much more time for touch selection to stabilize and allow adjustment
-            setTimeout(() => {
-                // Only process if this was the last touch event and enough time has passed
-                if (Date.now() - lastTouchEnd >= 800) {
-                    handleTextSelection();
-                }
-            }, 1000); // 1 second delay after touch ends
-        });
+        //document.getElementById('document-content').addEventListener('touchend', function(e) {
+        //  if (window.innerWidth < 992) {
+        //    lastTouchEnd = Date.now();
+        //   // Give much more time for touch selection to stabilize and allow adjustment
+        //    setTimeout(() => {
+        //        // Only process if this was the last touch event and enough time has passed
+        //        if (Date.now() - lastTouchEnd >= 800) {
+        //            handleTextSelection();
+        //        }
+        //    }, 1000); // 1 second delay after touch ends
+        //  }
+        //});
         
         // Keep mouseup for desktop with shorter delay
-        document.getElementById('document-content').addEventListener('mouseup', function() {
-            setTimeout(handleTextSelection, 100);
-        });
+        // no need for this because selectionchange is already handling it
+         document.getElementById('document-content').addEventListener('mouseup', function() {
+          if (window.innerWidth >= 992) {
+             setTimeout(handleTextSelection, 100);
+            }
+         });
         
         // Clear temporary highlight when clicking outside the document content
         document.addEventListener('click', function(event) {
             if (!document.getElementById('document-content').contains(event.target) && 
                 !document.getElementById('comment-text').contains(event.target) &&
                 !document.getElementById('add-annotation').contains(event.target) &&
-                !document.getElementById('selectionTooltip').contains(event.target)) {
+                !document.getElementById('selectionTooltip').contains(event.target) &&
+                !document.getElementById('annotationOffcanvas').contains(event.target) &&
+                !document.getElementById('comment-text-mobile').contains(event.target) &&
+                !document.getElementById('add-annotation-mobile').contains(event.target) &&
+                !document.getElementById('selected-text-mobile').contains(event.target)) {
+                  console.log('Clicked outside document content, clearing selection');
                 removeTemporaryHighlight();
                 hideMobileTooltip();
                 currentSelection = null;
@@ -252,10 +270,33 @@
         });
         
         function handleTextSelection() {
+            if (isProcessingSelection) {
+                console.log('SKIPPING handleTextSelection - already processing');
+                return; // Prevent recursive calls
+            }
+            
+            // Skip if mobile offcanvas is open
+            if (window.innerWidth < 992) {
+                const offcanvas = document.getElementById('annotationOffcanvas');
+                if (offcanvas && offcanvas.classList.contains('show')) {
+                    console.log('SKIPPING handleTextSelection - offcanvas is open');
+                    return;
+                }
+            }
+            
+            console.log('=== STARTING handleTextSelection ===');
+            isProcessingSelection = true;
+            
             const selection = window.getSelection();
             console.log('Selection changed, range count:', selection.rangeCount); // Debug
+            console.log('Selection details:', {
+                rangeCount: selection.rangeCount,
+                isCollapsed: selection.isCollapsed,
+                text: selection.toString().substring(0, 50) + '...'
+            });
             
             if (selection.rangeCount > 0 && !selection.isCollapsed) {
+                console.log('Processing valid selection...');
                 const range = selection.getRangeAt(0);
                 
                 // Check if selection is within document content
@@ -263,16 +304,15 @@
                 if (!documentContent.contains(range.commonAncestorContainer) && 
                     range.commonAncestorContainer !== documentContent) {
                     console.log('Selection not in document content'); // Debug
+                    isProcessingSelection = false;
                     return;
                 }
+                
+                console.log('Selection is within document content, expanding...');
                 
                 // Expand selection to word boundaries
                 const expandedRange = expandToWordBoundaries(range);
                 if (expandedRange) {
-                    // Update the selection to the expanded range
-                    selection.removeAllRanges();
-                    selection.addRange(expandedRange);
-                    
                     const selectedText = expandedRange.toString().trim();
                     console.log('Expanded selected text:', selectedText); // Debug
                     
@@ -286,8 +326,18 @@
                         
                         console.log('Current selection:', currentSelection); // Debug
                         
+                        // DON'T update the browser selection - just use our stored range
+                        // This avoids triggering additional selectionchange events
+                        
                         // Add temporary highlight to the selected text
+                        console.log('About to add temporary highlight...');
                         addTemporaryHighlight(currentSelection.range);
+                        
+                        console.log('AFTER addTemporaryHighlight - final selection check:', {
+                            rangeCount: selection.rangeCount,
+                            isCollapsed: selection.isCollapsed,
+                            text: selection.toString()
+                        });
                         
                         // Update mobile selected text preview
                         updateSelectedTextPreview(selectedText);
@@ -310,6 +360,12 @@
                 hideMobileTooltip();
                 currentSelection = null;
             }
+            
+            // Reset the flag after a short delay to allow for DOM updates
+            setTimeout(() => {
+                console.log('=== ENDING handleTextSelection - resetting flag ===');
+                isProcessingSelection = false;
+            }, 100);
         }
         
         function updateSelectedTextPreview(selectedText) {
@@ -423,8 +479,8 @@
                 tooltip.addEventListener('click', function(e) {
                     e.preventDefault();
                     e.stopPropagation();
-                    hideMobileTooltip();
-                    removeTemporaryHighlight();
+                    //hideMobileTooltip();
+                    //removeTemporaryHighlight();
                     openMobileOffcanvas();
                 });
                 tooltip.setAttribute('data-click-handler', 'true');
@@ -516,8 +572,16 @@
         // Function to open offcanvas on mobile
         function openMobileOffcanvas() {
             if (window.innerWidth < 992) { // Bootstrap lg breakpoint
+                // Prevent selection handling while opening offcanvas
+                isProcessingSelection = true;
+                
                 const offcanvas = new bootstrap.Offcanvas(document.getElementById('annotationOffcanvas'));
                 offcanvas.show();
+                
+                // Reset flag after offcanvas is opened
+                setTimeout(() => {
+                    isProcessingSelection = false;
+                }, 500); // Give enough time for offcanvas animation and focus changes
             }
         }
         
@@ -585,6 +649,7 @@
             // Remove any existing temporary highlight first
             removeTemporaryHighlight();
             
+            // DON'T save/restore selection - this is what's causing the issue
             console.log('Adding temporary highlight...'); // Debug
             
             const rects = range.getClientRects();
@@ -598,19 +663,19 @@
                 const rect = rects[i];
                 const highlight = document.createElement('div');
                 
-                // Make it very visible for testing
                 highlight.style.position = 'absolute';
-                highlight.style.backgroundColor = '#ff0000'; // Red for testing
-                highlight.style.opacity = '0.8'; // High opacity for testing
-                highlight.style.zIndex = '999'; // Very high z-index
+                highlight.style.backgroundColor = '#ffff00';
+                highlight.style.opacity = '0.3';
+                highlight.style.zIndex = '0';
                 highlight.style.pointerEvents = 'none';
-                highlight.style.border = '3px solid #0000ff'; // Blue border
+                highlight.style.border = '2px solid #ff6b35';
+                highlight.style.mixBlendMode = 'normal';
+                highlight.style.transition = 'opacity 0.2s ease';
                 highlight.style.left = (rect.left - containerRect.left) + 'px';
                 highlight.style.top = (rect.top - containerRect.top) + 'px';
                 highlight.style.width = rect.width + 'px';
                 highlight.style.height = rect.height + 'px';
                 highlight.className = 'temporary-highlight';
-                highlight.dataset.temporary = 'true';
                 
                 console.log('Created highlight with rect:', rect); // Debug
                 console.log('Positioned at:', {

@@ -20,6 +20,68 @@ BASE_PATH = os.environ.get('BASE_PATH', '')
 
 socketio = SocketIO(app, cors_allowed_origins="*")
 
+def seed_documents():
+    """Seed the database with conference documents"""
+    documents = [
+        {
+            'id': 'hyperlocal-hotspot',
+            'title': 'Hyperlocal Hotspot – Compiler',
+            'file': 'hyperlocal-hotspot.html'
+        },
+        {
+            'id': 'planetary-design',
+            'title': 'Planetary Design: On the emerging logics of Generative AI – Orit Halpern',
+            'file': 'planetary-design.html'
+        },
+        {
+            'id': 'diffractive-politics',
+            'title': 'Diffractive Politics: Accelerationism, Computation, & the Political – Ezekiel Dixon-Román',
+            'file': 'diffractive-politics.html'
+        },
+        {
+            'id': 'infrastructures-political-values',
+            'title': 'Infrastructures of Political Values – Connal Parsley',
+            'file': 'infrastructures-political-values.html'
+        },
+        {
+            'id': 'infrastructuring-architecture',
+            'title': 'Infrastructuring Architecture Knowledge – Sol Pérez Martínez',
+            'file': 'infrastructuring-architecture.html'
+        },
+        {
+            'id': 'sustainable-ai',
+            'title': 'Reimagining AI and IT for Sustainable Infrastructure',
+            'file': 'sustainable-ai.html'
+        },
+        {
+            'id': 'discussion',
+            'title': 'Discussion Session',
+            'file': 'discussion.html'
+        }
+    ]
+    
+    conn = get_db_connection()
+    
+    for doc in documents:
+        # Check if document already exists
+        existing = conn.execute('SELECT id FROM documents WHERE id = ?', (doc['id'],)).fetchone()
+        if not existing:
+            # Read content from file
+            try:
+                with open(f"documents/{doc['file']}", 'r', encoding='utf-8') as f:
+                    content = f.read()
+                
+                conn.execute('INSERT INTO documents (id, title, content) VALUES (?, ?, ?)', 
+                           (doc['id'], doc['title'], content))
+                logger.info(f"Seeded document: {doc['title']}")
+            except FileNotFoundError:
+                logger.warning(f"Document file not found: {doc['file']}")
+            except Exception as e:
+                logger.error(f"Error seeding document {doc['id']}: {e}")
+    
+    conn.commit()
+    conn.close()
+
 # Database initialization
 def init_db():
     conn = sqlite3.connect('annotations.db')
@@ -62,6 +124,10 @@ def get_db_connection():
 # Initialize database on startup
 init_db()
 
+# Seed documents on startup
+seed_documents()
+seed_documents()
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -79,33 +145,8 @@ def document(doc_id):
     if document:
         return render_template('document.html', document=document, annotations=annotations)
     else:
-        # Create a sample document if none exists
-        sample_content = """
-        <h1>Sample Document for Annotation</h1>
-        <p>This is a sample document that demonstrates the text annotation system. You can select any text in this document and add comments or highlights that will be visible to all users in real-time.</p>
-        
-        <p>The annotation system supports:</p>
-        <ul>
-            <li>Real-time highlighting of selected text</li>
-            <li>Collaborative commenting on text selections</li>
-            <li>Persistent storage of all annotations</li>
-            <li>Color-coded highlights for different types of annotations</li>
-        </ul>
-        
-        <p>To use the system, simply select any text and choose to either highlight it or add a comment. Your annotations will be immediately visible to all other users viewing this document.</p>
-        
-        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
-        """
-        
-        conn = get_db_connection()
-        conn.execute('INSERT INTO documents (id, title, content) VALUES (?, ?, ?)', 
-                    (doc_id, 'Sample Document', sample_content))
-        conn.commit()
-        document = conn.execute('SELECT * FROM documents WHERE id = ?', (doc_id,)).fetchone()
-        annotations = []
-        conn.close()
-        
-        return render_template('document.html', document=document, annotations=annotations)
+        # Return 404 if document doesn't exist
+        return 'Document not found', 404
 
 @app.route('/api/annotations/<text_id>')
 def get_annotations(text_id):
